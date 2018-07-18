@@ -27,12 +27,16 @@ string split
 ************************************************************/
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 // for udp.
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+
+// Regex
+using System.Text.RegularExpressions;
 
 /************************************************************
 ************************************************************/
@@ -42,7 +46,7 @@ public class udp_receive : MonoBehaviour {
 	****************************************/
 	[SerializeField] int IN_PORT = 12345;
 	
-	static UdpClient udp;
+	static UdpClient udp = null; // need to be "static" to be touched in thread.
 	Thread thread;
 	
 	static private string label = "saijo";
@@ -68,9 +72,21 @@ public class udp_receive : MonoBehaviour {
 
 	/******************************
 	******************************/
+	void OnDestroy () {
+		Debug.Log("OnDestroy:udp_receive");
+		
+		udp.Close();
+		udp = null;
+		
+ 		thread.Abort();
+		thread = null;
+	}
+	
+	/******************************
+	******************************/
 	void OnApplicationQuit()
 	{
-		thread.Abort();
+		// thread.Abort();
 	}
 
 	/******************************

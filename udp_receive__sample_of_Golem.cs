@@ -86,10 +86,10 @@ public class udp_receive : MonoBehaviour {
 	******************************/
 	void Update ()
 	{
-		/********************
-		********************/
-		if(b_set_BoneDefsList){
-			lock(sync){
+		lock(sync){
+			/********************
+			********************/
+			if(b_set_BoneDefsList){
 				if(StateChart_main){
 					StateChart_main.FromGolem__boneDefsList = boneDefsList;
 					StateChart_main.b_set_BoneDefsList = true;
@@ -105,11 +105,10 @@ public class udp_receive : MonoBehaviour {
 				
 				b_set_BoneDefsList = false;
 			}
-		}
-		
-				
-		if(FromGolem__FrameDataAll.b_set){
-			lock(sync){
+			
+			/********************
+			********************/
+			if(FromGolem__FrameDataAll.b_set){
 				if(StateChart_main)		StateChart_main.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
 				if(StateChart_Scene)	StateChart_Scene.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
 				if(StateChart_Mugen)	StateChart_Mugen.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
@@ -117,7 +116,6 @@ public class udp_receive : MonoBehaviour {
 				FromGolem__FrameDataAll.b_set = false;
 			}
 		}
-
 	}
 
 	/******************************

@@ -8,6 +8,9 @@ string split
 
 Regex.Split
 	https://www.sawalemontea.com/entry/2018/02/16/193000
+	
+thread:lock
+	http://tsubakit1.hateblo.jp/entry/20121110/1352555965
 ************************************************************/
 using UnityEngine;
 using System.Collections;
@@ -36,6 +39,10 @@ public class udp_receive : MonoBehaviour {
 	****************************************/
 	/********************
 	********************/
+	static Object sync = new Object();
+
+	/********************
+	********************/
 	[SerializeField]
 	int IN_PORT = 12352;
 	
@@ -44,15 +51,21 @@ public class udp_receive : MonoBehaviour {
 	
 	/********************
 	********************/
+	static List<BoneDefs> boneDefsList = new List<BoneDefs>();
+	static bool b_set_BoneDefsList = false;
+	
 	static FROM_GOLEM__FRAMEDATA_ALL FromGolem__FrameDataAll = new FROM_GOLEM__FRAMEDATA_ALL();
 	
-	static StateChart_main StateChart_main = null;
-	static StateChart_Scene StateChart_Scene = null;
-	static StateChart_Mugen StateChart_Mugen = null;
+	
+	StateChart_main StateChart_main = null;
+	StateChart_Scene StateChart_Scene = null;
+	StateChart_Mugen StateChart_Mugen = null;
+	
 	
 	/****************************************
 	****************************************/
-
+	/******************************
+	******************************/
 	void Start ()
 	{
 		/********************
@@ -69,10 +82,46 @@ public class udp_receive : MonoBehaviour {
 		StateChart_Mugen = gameObject.GetComponent<StateChart_Mugen>();
 	}
 
+	/******************************
+	******************************/
 	void Update ()
 	{
+		/********************
+		********************/
+		if(b_set_BoneDefsList){
+			lock(sync){
+				if(StateChart_main){
+					StateChart_main.FromGolem__boneDefsList = boneDefsList;
+					StateChart_main.b_set_BoneDefsList = true;
+				}
+				if(StateChart_Scene){
+					StateChart_Scene.FromGolem__boneDefsList = boneDefsList;
+					StateChart_Scene.b_set_BoneDefsList = true;
+				}
+				if(StateChart_Mugen){
+					StateChart_Mugen.FromGolem__boneDefsList = boneDefsList;
+					StateChart_Mugen.b_set_BoneDefsList = true;
+				}
+				
+				b_set_BoneDefsList = false;
+			}
+		}
+		
+				
+		if(FromGolem__FrameDataAll.b_set){
+			lock(sync){
+				if(StateChart_main)		StateChart_main.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
+				if(StateChart_Scene)	StateChart_Scene.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
+				if(StateChart_Mugen)	StateChart_Mugen.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
+				
+				FromGolem__FrameDataAll.b_set = false;
+			}
+		}
+
 	}
 
+	/******************************
+	******************************/
 	void OnDestroy () {
 		Debug.Log("OnDestroy:udp_receive");
 		
@@ -83,6 +132,8 @@ public class udp_receive : MonoBehaviour {
 		thread = null;
 	}
 	
+	/******************************
+	******************************/
 	void OnApplicationQuit()
 	{
 		// thread.Abort();
@@ -103,7 +154,7 @@ public class udp_receive : MonoBehaviour {
 		********************/
 		Debug.Log("set skelton definition");
 		
-		List<BoneDefs> boneDefsList = new List<BoneDefs>();
+		boneDefsList.Clear();
 		
 		for(int i = 0; i < 27; i++){
 			// string[] data = Regex.Split(block[i + 1], "|");
@@ -125,18 +176,8 @@ public class udp_receive : MonoBehaviour {
 											(float)(System.Convert.ToDouble(data[9]))
 											));
 		}
-		if(StateChart_main){
-			StateChart_main.FromGolem__boneDefsList = boneDefsList;
-			StateChart_main.b_set_BoneDefsList = true;
-		}
-		if(StateChart_Scene){
-			StateChart_Scene.FromGolem__boneDefsList = boneDefsList;
-			StateChart_Scene.b_set_BoneDefsList = true;
-		}
-		if(StateChart_Mugen){
-			StateChart_Mugen.FromGolem__boneDefsList = boneDefsList;
-			StateChart_Mugen.b_set_BoneDefsList = true;
-		}
+		
+		b_set_BoneDefsList = true;
 	}
 
 	/******************************
@@ -208,9 +249,7 @@ public class udp_receive : MonoBehaviour {
 		
 		/********************
 		********************/
-		if(StateChart_main)		StateChart_main.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
-		if(StateChart_Scene)	StateChart_Scene.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
-		if(StateChart_Mugen)	StateChart_Mugen.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
+		FromGolem__FrameDataAll.b_set = true;
 	}
 	
 	/******************************
@@ -225,9 +264,13 @@ public class udp_receive : MonoBehaviour {
 			
 			string[] block = Regex.Split(str_message, "<p>");
 			if(System.Convert.ToString(block[0]) == "/Golem/SkeletonDefinition"){
-				Set_SkeltonDefinition(ref block);
+				lock(sync){
+					Set_SkeltonDefinition(ref block);
+				}
 			}else if(System.Convert.ToString(block[0]) == "/Golem/SkeletonData"){
-				Set_FrameData_All(ref block);
+				lock(sync){
+					Set_FrameData_All(ref block);
+				}
 			}
 			
 			Thread.Sleep(1);

@@ -112,6 +112,11 @@ public class udp_receive : MonoBehaviour {
 				label += ", ";
 			}
 			label += ")";
+			
+			/********************
+			for lower cpu power.
+			********************/
+			Thread.Sleep(1);
 		}
 	}
 	

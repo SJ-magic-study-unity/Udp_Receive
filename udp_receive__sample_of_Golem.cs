@@ -23,6 +23,8 @@ using System.Threading;
 using Golem;
 
 using SCENE_DEMO;
+using SCENE_SIMPLE;
+using SCENE_MUGEN;
 
 using System.Text.RegularExpressions;
 
@@ -38,14 +40,15 @@ public class udp_receive : MonoBehaviour {
 	int IN_PORT = 12352;
 	
 	static UdpClient udp = null; // need to be "static" to be touched in thread.
-	Thread thread;
+	static Thread thread;
 	
 	/********************
 	********************/
 	static FROM_GOLEM__FRAMEDATA_ALL FromGolem__FrameDataAll = new FROM_GOLEM__FRAMEDATA_ALL();
 	
-	static StateChart_main StateChart_main;
-	
+	static StateChart_main StateChart_main = null;
+	static StateChart_Scene StateChart_Scene = null;
+	static StateChart_Mugen StateChart_Mugen = null;
 	
 	/****************************************
 	****************************************/
@@ -62,6 +65,8 @@ public class udp_receive : MonoBehaviour {
 		/********************
 		********************/
 		StateChart_main = gameObject.GetComponent<StateChart_main>();
+		StateChart_Scene = gameObject.GetComponent<StateChart_Scene>();
+		StateChart_Mugen = gameObject.GetComponent<StateChart_Mugen>();
 	}
 
 	void Update ()
@@ -120,8 +125,18 @@ public class udp_receive : MonoBehaviour {
 											(float)(System.Convert.ToDouble(data[9]))
 											));
 		}
-		StateChart_main.FromGolem__boneDefsList = boneDefsList;
-		StateChart_main.b_set_BoneDefsList = true;
+		if(StateChart_main){
+			StateChart_main.FromGolem__boneDefsList = boneDefsList;
+			StateChart_main.b_set_BoneDefsList = true;
+		}
+		if(StateChart_Scene){
+			StateChart_Scene.FromGolem__boneDefsList = boneDefsList;
+			StateChart_Scene.b_set_BoneDefsList = true;
+		}
+		if(StateChart_Mugen){
+			StateChart_Mugen.FromGolem__boneDefsList = boneDefsList;
+			StateChart_Mugen.b_set_BoneDefsList = true;
+		}
 	}
 
 	/******************************
@@ -180,12 +195,22 @@ public class udp_receive : MonoBehaviour {
 		// FrameId is for debug.
 		// so, Real Golem system will not send this item.
 		ofs++;
-		if(233 <= data.Length)	FromGolem__FrameDataAll.FrameId = System.Convert.ToInt32(data[ofs]);
-		else					FromGolem__FrameDataAll.FrameId = 0;
+		if(233 <= data.Length){
+			int FrameId;
+			
+			bool b_Converted = int.TryParse(data[ofs], out FrameId);
+			if(b_Converted)	FromGolem__FrameDataAll.FrameId = System.Convert.ToInt32(data[ofs]);
+			else			FromGolem__FrameDataAll.FrameId = 0;
+			
+		}else{
+			FromGolem__FrameDataAll.FrameId = 0;
+		}
 		
 		/********************
 		********************/
-		StateChart_main.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
+		if(StateChart_main)		StateChart_main.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
+		if(StateChart_Scene)	StateChart_Scene.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
+		if(StateChart_Mugen)	StateChart_Mugen.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
 	}
 	
 	/******************************
@@ -201,9 +226,11 @@ public class udp_receive : MonoBehaviour {
 			string[] block = Regex.Split(str_message, "<p>");
 			if(System.Convert.ToString(block[0]) == "/Golem/SkeletonDefinition"){
 				Set_SkeltonDefinition(ref block);
-			}else if(System.Convert.ToString(block[0]) == "/Golem/SkeltonData"){
+			}else if(System.Convert.ToString(block[0]) == "/Golem/SkeletonData"){
 				Set_FrameData_All(ref block);
 			}
+			
+			Thread.Sleep(1);
 		}
 	}
 }

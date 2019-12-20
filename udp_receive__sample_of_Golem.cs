@@ -4,13 +4,45 @@
 		https://qiita.com/nenjiru/items/8fa8dfb27f55c0205651
 	
 string split
-	https://www.sawalemontea.com/entry/2017/11/09/210000
+	string.Split
+		https://www.sawalemontea.com/entry/2017/11/09/210000
+		
+	Regex.Split
+		https://www.sawalemontea.com/entry/2018/02/16/193000
+			var text = "AAｈりうｈAAｖほｇｈAAｈｒｈAAAAああｖｈｓ";
+			var words = Regex.Split(text, "AA");
+			
+			foreach(var word in words)
+			{
+				Console.WriteLine("「{0}」",word);
+			}
+			
+	sj note
+		separatorが1文字の時は、Split、
+		複数文字の時は、Regex.Split.
+		
+		だったら全部、Regex.Splitでsplitしてしまえばいいのでは？と思ったのだが、
+		1文字に対してこれを
+			var words = Regex.Split(text, "|");
+		などとやると、上手く行かなかった.
 
-Regex.Split
-	https://www.sawalemontea.com/entry/2018/02/16/193000
-	
+
 thread:lock
 	http://tsubakit1.hateblo.jp/entry/20121110/1352555965
+	
+
+Thread.Abort メソッドを利用してスレッドを終了させる際の注意点について
+	https://blogs.msdn.microsoft.com/japan_platform_sdkwindows_sdk_support_team_blog/2018/04/13/thread-abort-method/
+		
+		contents
+			Abort メソッドはスレッドを強制終了させるメソッドです。
+			Abort メソッドを利用してスレッドを強制終了させると、以下の様な現象が発生する可能性があります。
+			・ オブジェクト ハンドルやメモリ等のリーク
+			・ プロセスの強制終了
+			・ プロセスのデッドロック
+	
+スレッド終了 - [ マルチスレッド / C# ]
+	http://bicycle.life.coocan.jp/takamints/index.php/snippets/snippet/mt/endthread/cs
 ************************************************************/
 using UnityEngine;
 using System.Collections;
@@ -26,8 +58,6 @@ using System.Threading;
 using Golem;
 
 using SCENE_DEMO;
-using SCENE_SIMPLE;
-using SCENE_MUGEN;
 
 using System.Text.RegularExpressions;
 
@@ -43,11 +73,11 @@ public class udp_receive : MonoBehaviour {
 
 	/********************
 	********************/
-	[SerializeField]
-	int IN_PORT = 12352;
+	[SerializeField] int IN_PORT = 12351;
 	
 	static UdpClient udp = null; // need to be "static" to be touched in thread.
 	static Thread thread;
+	static bool b_ThreadRunning = false;
 	
 	/********************
 	********************/
@@ -58,8 +88,6 @@ public class udp_receive : MonoBehaviour {
 	
 	
 	StateChart_main StateChart_main = null;
-	StateChart_Scene StateChart_Scene = null;
-	StateChart_Mugen StateChart_Mugen = null;
 	
 	
 	/****************************************
@@ -72,14 +100,14 @@ public class udp_receive : MonoBehaviour {
 		********************/
 		udp = new UdpClient(IN_PORT);
 		// udp.Client.ReceiveTimeout = 1000;
+		
 		thread = new Thread(new ThreadStart(ThreadMethod));
+		b_ThreadRunning = true;
 		thread.Start(); 
 		
 		/********************
 		********************/
 		StateChart_main = gameObject.GetComponent<StateChart_main>();
-		StateChart_Scene = gameObject.GetComponent<StateChart_Scene>();
-		StateChart_Mugen = gameObject.GetComponent<StateChart_Mugen>();
 	}
 
 	/******************************
@@ -91,16 +119,8 @@ public class udp_receive : MonoBehaviour {
 			********************/
 			if(b_set_BoneDefsList){
 				if(StateChart_main){
-					StateChart_main.FromGolem__boneDefsList = boneDefsList;
+					GlobalParam.FromGolem__boneDefsList = boneDefsList;
 					StateChart_main.b_set_BoneDefsList = true;
-				}
-				if(StateChart_Scene){
-					StateChart_Scene.FromGolem__boneDefsList = boneDefsList;
-					StateChart_Scene.b_set_BoneDefsList = true;
-				}
-				if(StateChart_Mugen){
-					StateChart_Mugen.FromGolem__boneDefsList = boneDefsList;
-					StateChart_Mugen.b_set_BoneDefsList = true;
 				}
 				
 				b_set_BoneDefsList = false;
@@ -110,8 +130,6 @@ public class udp_receive : MonoBehaviour {
 			********************/
 			if(FromGolem__FrameDataAll.b_set){
 				if(StateChart_main)		StateChart_main.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
-				if(StateChart_Scene)	StateChart_Scene.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
-				if(StateChart_Mugen)	StateChart_Mugen.FromGolem__FrameData_All.set(ref FromGolem__FrameDataAll);
 				
 				FromGolem__FrameDataAll.b_set = false;
 			}
@@ -121,13 +139,21 @@ public class udp_receive : MonoBehaviour {
 	/******************************
 	******************************/
 	void OnDestroy () {
+		if(thread != null) {
+			/*
+			thread.Abort();
+			thread = null;
+			*/
+            b_ThreadRunning = false;//終了要求
+            thread.Join();//実際に終了するのを待つ
+            thread = null;
+			
+			// 注) udpは、thread stopの後
+			udp.Close();
+			udp = null;
+        }
+		
 		Debug.Log("OnDestroy:udp_receive");
-		
-		udp.Close();
-		udp = null;
-		
- 		thread.Abort();
-		thread = null;
 	}
 	
 	/******************************
@@ -256,6 +282,8 @@ public class udp_receive : MonoBehaviour {
 	{
 		while(true)
 		{
+			/********************
+			********************/
 			IPEndPoint remoteEP = null;
 			byte[] message = udp.Receive(ref remoteEP);
 			string str_message = Encoding.ASCII.GetString(message);
@@ -271,6 +299,14 @@ public class udp_receive : MonoBehaviour {
 				}
 			}
 			
+			/********************
+			********************/
+			bool _b_ThreadRunning;
+			lock(sync) { _b_ThreadRunning = b_ThreadRunning; }
+			if(!_b_ThreadRunning) break;
+			
+			/********************
+			********************/
 			Thread.Sleep(1);
 		}
 	}

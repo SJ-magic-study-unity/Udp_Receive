@@ -4,29 +4,11 @@
 		https://qiita.com/nenjiru/items/8fa8dfb27f55c0205651
 	
 string split
-	string.Split
-		https://www.sawalemontea.com/entry/2017/11/09/210000
-		
-	Regex.Split
-		https://www.sawalemontea.com/entry/2018/02/16/193000
-			var text = "AAｈりうｈAAｖほｇｈAAｈｒｈAAAAああｖｈｓ";
-			var words = Regex.Split(text, "AA");
-			
-			foreach(var word in words)
-			{
-				Console.WriteLine("「{0}」",word);
-			}
-			
-	sj note
-		separatorが1文字の時は、Split、
-		複数文字の時は、Regex.Split.
-		
-		だったら全部、Regex.Splitでsplitしてしまえばいいのでは？と思ったのだが、
-		1文字に対してこれを
-			var words = Regex.Split(text, "|");
-		などとやると、上手く行かなかった.
+	https://www.sawalemontea.com/entry/2017/11/09/210000
 
-
+Regex.Split
+	https://www.sawalemontea.com/entry/2018/02/16/193000
+	
 thread:lock
 	http://tsubakit1.hateblo.jp/entry/20121110/1352555965
 	
@@ -99,7 +81,7 @@ public class udp_receive : MonoBehaviour {
 		/********************
 		********************/
 		udp = new UdpClient(IN_PORT);
-		// udp.Client.ReceiveTimeout = 1000;
+		udp.Client.ReceiveTimeout = 1000;
 		
 		thread = new Thread(new ThreadStart(ThreadMethod));
 		b_ThreadRunning = true;
@@ -140,20 +122,19 @@ public class udp_receive : MonoBehaviour {
 	******************************/
 	void OnDestroy () {
 		if(thread != null) {
-			/*
-			thread.Abort();
-			thread = null;
-			*/
-            b_ThreadRunning = false;//終了要求
-            thread.Join();//実際に終了するのを待つ
+			lock(sync){
+				b_ThreadRunning = false;//終了要求
+			}
+			if(thread.Join(2000/*ms*/))	{/*success*/}
+			else						{thread.Abort(); /*timeout -> 強制終了.*/}
             thread = null;
 			
 			// 注) udpは、thread stopの後
-			udp.Close();
-			udp = null;
+			if(udp != null){
+				udp.Close();
+				udp = null;
+			}
         }
-		
-		Debug.Log("OnDestroy:udp_receive");
 	}
 	
 	/******************************
@@ -285,7 +266,27 @@ public class udp_receive : MonoBehaviour {
 			/********************
 			********************/
 			IPEndPoint remoteEP = null;
-			byte[] message = udp.Receive(ref remoteEP);
+			
+			/********************
+			Start()で、下記をコメントアウトすると、
+				udp.Client.ReceiveTimeout = 1000;
+				
+			以下で、message来るまで、ずっと待機
+				message = udp.Receive(ref remoteEP);
+				
+			もし、udpの相手がいない場合、threadを抜けられなくなる(Abortすればいいのだけど)ので、
+			timeoutを設けた上で、try/catchを実装。catchしてやらないと、例外が漏れて、落ちてしまう。
+			********************/
+			byte[] message;
+			try{
+				message = udp.Receive(ref remoteEP);
+			}catch (SocketException){
+				// Debug.Log("udp:timeout");
+				message = System.Text.Encoding.GetEncoding("shift_jis").GetBytes("");
+			}
+			
+			/********************
+			********************/
 			string str_message = Encoding.ASCII.GetString(message);
 			
 			string[] block = Regex.Split(str_message, "<p>");
